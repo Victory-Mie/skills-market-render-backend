@@ -1,0 +1,208 @@
+// Skills Market Database Schema - PostgreSQL (Supabase)
+// Vercel Serverless Functions Compatible
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== User System ====================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Hashed password
+  name      String?
+  avatar    String?
+  role      String   @default("USER") // USER, DEVELOPER, ADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  skills     Skill[]
+  purchases  Order[]
+  reviews    Review[]
+  rentals    Rental[]
+
+  @@index([email])
+}
+
+// ==================== Skill Management ====================
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  icon      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  skills Skill[]
+
+  @@index([slug])
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String
+  longDesc    String?   @db.Text
+  version     String   @default("1.0.0")
+
+  // Pricing
+  price       Float    @default(0) // 0 = free, >0 = paid
+  rentalPrice Float?   @default(0) // Week 1+: Rental price
+
+  // File & Media
+  icon        String?
+  screenshots String[] // PostgreSQL native array
+  downloadUrl String
+  fileSize    Int      // File size in bytes
+
+  // Metadata
+  status      String   @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED, ARCHIVED
+  rejectionReason String? @db.Text // Reason for rejection
+  license     String   @default("MIT")   // MIT, APACHE_2_0, GPL_3_0, BSD_3_CLAUSE, CUSTOM
+  official    Boolean  @default(false)  // Official tag
+
+  // Stats (updated periodically)
+  downloads   Int      @default(0)
+  purchases   Int      @default(0)
+  avgRating   Float    @default(0)
+  reviewCount Int      @default(0)
+
+  // Relations
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  // Week 2+ Features (extensibility)
+  tags        SkillTag[]
+  reviews     Review[]
+  orders      Order[]
+  rentals     Rental[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([official])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  // Relations
+  skills SkillTag[]
+
+  @@index([name])
+}
+
+model SkillTag {
+  skillId String
+  tagId   String
+
+  skill   Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([skillId, tagId])
+}
+
+// ==================== Transaction System ====================
+
+model Order {
+  id              String   @id @default(cuid())
+  orderNumber     String   @unique // Human-readable order ID
+
+  // Payment
+  skillId         String
+  skill           Skill    @relation(fields: [skillId], references: [id])
+  buyerId         String
+  buyer           User     @relation(fields: [buyerId], references: [id])
+
+  amount          Float
+  paymentMethod   String   // STRIPE, ALIPAY, WECHAT_PAY, FREE
+  paymentStatus   String   @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  transactionId   String?  // External payment ID (Stripe, etc.)
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  @@index([orderNumber])
+  @@index([buyerId])
+  @@index([skillId])
+  @@index([paymentStatus])
+}
+
+// ==================== Review System ====================
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  comment   String   @db.Text
+
+  skillId   String
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([skillId])
+  @@index([userId])
+  @@unique([skillId, userId]) // One review per user per skill
+}
+
+// ==================== Rental System (Week 1+) ====================
+
+model Rental {
+  id          String   @id @default(cuid())
+  skillId     String
+  skill       Skill    @relation(fields: [skillId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  type        String   // SINGLE_USE, WEEKLY
+  usageCount  Int      @default(0) // For single-use tracking
+
+  startDate   DateTime @default(now())
+  endDate     DateTime? // null for single-use
+
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([skillId])
+  @@index([endDate])
+}
+
+// ==================== Admin Audit (Optional) ====================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // CREATE, UPDATE, DELETE, APPROVE, REJECT
+  entity    String   // skill, user, order, review
+  entityId  String
+  actorId   String?  // Admin who performed the action
+  details   String?  @db.Text // JSON string of additional context
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
+}
