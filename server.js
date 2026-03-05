@@ -1,8 +1,27 @@
 import express from 'express';
 import cors from 'cors';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 初始化数据库表
+async function initDB() {
+  try {
+    await prisma.$connect();
+    console.log('Database connected');
+    
+    // 检查用户表是否存在
+    const userCount = await prisma.user.count().catch(() => 0);
+    console.log('Database initialized, user count:', userCount);
+  } catch (error) {
+    console.error('Database init error:', error.message);
+  }
+}
+
+initDB();
 
 // Middleware
 app.use(cors());
