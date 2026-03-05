@@ -90,6 +90,7 @@ model Skill {
   orders      Order[]
   rentals     Rental[]
   trialConfig TrialConfig? // Trial configuration (optional)
+  trials      Trial[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
