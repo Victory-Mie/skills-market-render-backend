@@ -23,6 +23,76 @@ const prisma = new PrismaClient();
 
 // Import auth utilities
 import { verifyToken } from './utils/auth.js';
+import bcrypt from 'bcryptjs';
+
+// Auth API
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: '邮箱和密码必填' });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: '该邮箱已被注册' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name: name || email.split('@')[0],
+        email,
+        password: hashedPassword,
+        role: 'USER'
+      }
+    });
+
+    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+
+    return res.status(201).json({
+      message: '注册成功',
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    return res.status(500).json({ error: '注册失败', message: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: '邮箱和密码必填' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ error: '邮箱或密码错误' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: '邮箱或密码错误' });
+    }
+
+    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+
+    return res.status(200).json({
+      message: '登录成功',
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({ error: '登录失败', message: error.message });
+  }
+});
 
 // Orders API
 app.get('/api/orders', async (req, res) => {
