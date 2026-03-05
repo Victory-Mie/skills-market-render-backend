@@ -1,10 +1,12 @@
 {
   "name": "skills-market-backend",
   "version": "1.0.0",
-  "description": "Skills Market Backend API - Vercel Serverless Functions",
-  "main": "api/index.js",
+  "description": "Skills Market Backend API",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "node server.js",
+    "start": "node server.js",
     "build": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -17,6 +19,8 @@
     "@prisma/client": "^5.7.1",
     "@supabase/supabase-js": "^2.39.0",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "zod": "^3.22.4"
   },
